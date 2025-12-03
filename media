@@ -1,0 +1,163 @@
+To transform your agent from a simple text reader into a true **Business Automation Powerhouse**, we need to give it "eyes" to read **Images** (scanned invoices) and **PDFs** (contracts).
+
+This module handles the **Media** layer.
+
+### 1\. Install New Tools
+
+You need a few extra libraries to handle images and PDFs. Run this in your terminal:
+
+```bash
+pip install pypdf pillow
+```
+
+-----
+
+### 2\. Create the Media Processor (`src/media.py`)
+
+Create a new file named `media.py` inside `src`. This file acts as the translator between raw files and the AI.
+
+It handles two hard tasks:
+
+1.  **PDFs:** It rips the text out of the document.
+2.  **Images:** It converts images into "Base64" code so the AI can "see" them.
+
+<!-- end list -->
+
+```python
+import base64
+from pypdf import PdfReader
+
+class MediaProcessor:
+    @staticmethod
+    def extract_pdf_text(file_path):
+        """
+        Reads a PDF file and turns it into a string of text.
+        """
+        try:
+            reader = PdfReader(file_path)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            return text
+        except Exception as e:
+            return f"Error reading PDF: {e}"
+
+    @staticmethod
+    def encode_image(image_path):
+        """
+        Converts an image file (JPG/PNG) into a base64 string
+        so OpenAI can analyze it.
+        """
+        try:
+            with open(image_path, "rb") as image_file:
+                return base64.b64encode(image_file.read()).decode('utf-8')
+        except Exception as e:
+            print(f"Error encoding image: {e}")
+            return None
+```
+
+-----
+
+### 3\. Upgrade the Brain (`src/core.py`)
+
+We need to update your `CoreAgent` in `src/core.py`. It needs a new function to handle **Vision**.
+
+Replace your existing `CoreAgent` class (or add this method to it) with this upgraded version:
+
+```python
+# ... (Keep your imports) ...
+
+class CoreAgent:
+    def __init__(self):
+        # ... (Keep your init) ...
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model = "gpt-4o"  # IMPORTANT: Switch to GPT-4o for Image Support
+
+    def process_text(self, text_input):
+        # ... (Your previous process logic for simple text) ...
+        pass 
+
+    def process_image(self, base64_image):
+        """
+        The Vision Logic. Looks at an image and extracts data.
+        """
+        print(f"👁️ Analyzing Image content...")
+
+        system_instruction = """
+        You are an AI Vision Agent processing business documents.
+        Extract data from this image (invoice/receipt) and return JSON.
+        Fields: company_name, date, total_amount, items (list).
+        """
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": system_instruction},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=300
+            )
+            
+            raw_content = response.choices[0].message.content
+            # Reuse your sanitize function from before
+            return self._sanitize_json(raw_content)
+
+        except Exception as e:
+            return {"error": "Vision Processing Failed", "details": str(e)}
+
+    # ... (Keep your _sanitize_json method) ...
+```
+
+-----
+
+### 4\. Connect it to the Main Loop (`src/main.py`)
+
+Finally, update the loop in `main.py` to check file types.
+
+```python
+# ... inside your main loop ...
+
+    for filename, content in files: # You will need to update read_files to return paths
+        file_ext = filename.split('.')[-1].lower()
+        
+        # A. Text & Code
+        if file_ext in ['txt', 'log', 'csv']:
+            data = brain.process_text(content)
+            
+        # B. PDFs
+        elif file_ext == 'pdf':
+            print("   > Extracting text from PDF...")
+            pdf_text = MediaProcessor.extract_pdf_text(full_path)
+            data = brain.process_text(pdf_text)
+            
+        # C. Images
+        elif file_ext in ['jpg', 'jpeg', 'png']:
+            print("   > Activating Computer Vision...")
+            base64_img = MediaProcessor.encode_image(full_path)
+            data = brain.process_image(base64_img)
+
+        # ... Save result ...
+```
+
+### Visualizing the Media Workflow
+
+Here is how your agent now handles different media types, converging them into one intelligent stream.
+
+**Summary of what you just built:**
+
+1.  **Text:** Goes straight to the LLM.
+2.  **PDFs:** Are converted to text, then sent to the LLM.
+3.  **Images:** Are encoded, sent to the Vision Model (GPT-4o), and returned as data.
+
+**Next Step:** Your agent creates JSON files. Would you like a **"Report Generator"** script (Excel/CSV) that combines all these JSONs into a single spreadsheet for your boss?
