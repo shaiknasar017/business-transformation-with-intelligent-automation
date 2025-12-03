@@ -1,0 +1,102 @@
+import os
+import subprocess
+
+# Name of your project
+PROJECT_NAME = "business_automation_agent"
+
+# The AI Agent Code (to be written into the file)
+AGENT_CODE = """
+import os
+import time
+import json
+import sys
+
+class BusinessAgent:
+    def _init_(self):
+        self.status = "IDLE"
+        print("🤖 Agent System Initialized: Ready for Business Transformation.")
+
+    def analyze_document(self, doc_text):
+        print(f"\\n[Process] Reading document: {doc_text[:30]}...")
+        # Simulate 'Intelligent Automation' processing time
+        time.sleep(1.5) 
+        
+        # Mock Logic: extracting data (In real life, this is where LLM code goes)
+        extracted_data = {
+            "type": "Invoice" if "invoice" in doc_text.lower() else "General Inquiry",
+            "urgency": "High" if "urgent" in doc_text.lower() else "Normal",
+            "status": "Processed",
+            "automation_score": "100%"
+        }
+        return extracted_data
+
+    def run(self):
+        print("--- WAITING FOR INPUT ---")
+        user_input = input("Paste manual text here (or type 'exit'): ")
+        
+        if user_input.lower() == 'exit':
+            sys.exit()
+            
+        result = self.analyze_document(user_input)
+        
+        print("\\n--- INTELLIGENT OUTPUT (JSON) ---")
+        print(json.dumps(result, indent=4))
+        print("-----------------------------------")
+
+if _name_ == "_main_":
+    agent = BusinessAgent()
+    while True:
+        agent.run()
+"""
+
+# The requirements file content
+REQ_TXT = """
+openai
+python-dotenv
+requests
+"""
+
+# The .gitignore content (Crucial for Git safety)
+GITIGNORE = """
+.env
+_pycache_/
+*.log
+.DS_Store
+"""
+
+def create_structure():
+    # 1. Create Root Directory
+    if not os.path.exists(PROJECT_NAME):
+        os.makedirs(PROJECT_NAME)
+        print(f"✅ Created directory: {PROJECT_NAME}")
+
+    # 2. Create Sub-directories
+    os.makedirs(os.path.join(PROJECT_NAME, "src"), exist_ok=True)
+    os.makedirs(os.path.join(PROJECT_NAME, "data"), exist_ok=True)
+
+    # 3. Create main.py
+    with open(os.path.join(PROJECT_NAME, "src", "main.py"), "w") as f:
+        f.write(AGENT_CODE)
+        print("✅ Created Agent Logic: src/main.py")
+
+    # 4. Create requirements.txt
+    with open(os.path.join(PROJECT_NAME, "requirements.txt"), "w") as f:
+        f.write(REQ_TXT)
+        print("✅ Created Dependency list: requirements.txt")
+
+    # 5. Create .gitignore (Important for Git)
+    with open(os.path.join(PROJECT_NAME, ".gitignore"), "w") as f:
+        f.write(GITIGNORE)
+        print("✅ Created Git Safety file: .gitignore")
+
+    # 6. Initialize Git Repo
+    try:
+        subprocess.run(["git", "init"], cwd=PROJECT_NAME, check=True)
+        print("✅ Initialized empty Git repository")
+    except Exception as e:
+        print(f"⚠ Could not initialize git automatically: {e}")
+
+    print(f"\n🚀 SUCCESS! Your agent is ready in the '{PROJECT_NAME}' folder.")
+
+if _name_ == "_main_":
+    create_structure()
