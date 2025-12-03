@@ -1,0 +1,163 @@
+To complete the transformation from "Manual Operations" to "Intelligent Automation," you need a user interface. This allows users who don't know Python to use your AI agent.
+
+We will use **Streamlit**, which is the industry standard for building fast AI dashboards.
+
+### 1\. Install Streamlit
+
+Run this in your terminal:
+
+```bash
+pip install streamlit
+```
+
+### 2\. Create the UI Application (`app.py`)
+
+Create a file named `app.py` in your **root** folder (outside `src`). This file connects your backend logic (`src/core.py` and `src/media.py`) to a web page.
+
+```python
+import streamlit as st
+import os
+import json
+import tempfile
+from src.core import CoreAgent
+from src.media import MediaProcessor
+
+# --- PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="Business Automation Agent",
+    page_icon="🤖",
+    layout="wide"
+)
+
+# --- HEADER ---
+st.title("🤖 Business Process Automation")
+st.markdown("""
+**Transforming Manual Operations into Intelligent Data.** Upload a messy document (Invoice, Email, Contract) and watch the AI structure it.
+""")
+st.divider()
+
+# --- SIDEBAR (Settings) ---
+with st.sidebar:
+    st.header("⚙️ Configuration")
+    api_key = st.text_input("OpenAI API Key", type="password")
+    
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
+    
+    st.info("Files are processed locally and sent to OpenAI for analysis.")
+    model_choice = st.selectbox("Select Model", ["gpt-4o", "gpt-3.5-turbo"])
+
+# --- MAIN LOGIC ---
+
+# 1. Initialize the Brain
+if "agent" not in st.session_state:
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            st.session_state.agent = CoreAgent()
+            # Update model based on selection
+            st.session_state.agent.model = model_choice
+            st.success("System Online: Ready to process.")
+        except Exception as e:
+            st.error(f"System Error: {e}")
+    else:
+        st.warning("Please enter your API Key in the sidebar to start.")
+
+# 2. Input Tabs
+tab1, tab2 = st.tabs(["📂 Upload File", "✍️ Manual Text"])
+
+raw_data = None
+file_type = None
+
+with tab1:
+    uploaded_file = st.file_uploader("Upload PDF, JPG, or PNG", type=["pdf", "jpg", "png", "jpeg"])
+    if uploaded_file:
+        # Save temp file to handle path-based logic
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp:
+            tmp.write(uploaded_file.getvalue())
+            temp_path = tmp.name
+        
+        file_type = uploaded_file.name.split('.')[-1].lower()
+        
+        # Display Preview
+        if file_type in ['jpg', 'png', 'jpeg']:
+            st.image(uploaded_file, caption="Document Preview", use_column_width=True)
+            # Encode for AI
+            raw_data = MediaProcessor.encode_image(temp_path)
+        elif file_type == 'pdf':
+            st.write("📄 PDF Document Loaded")
+            # Extract text
+            raw_data = MediaProcessor.extract_pdf_text(temp_path)
+
+with tab2:
+    text_input = st.text_area("Paste email or log text here:", height=200)
+    if text_input:
+        raw_data = text_input
+        file_type = "text"
+
+# 3. The Transformation Button
+if st.button("🚀 Run Intelligent Automation", type="primary"):
+    if not raw_data:
+        st.error("Please provide input data first.")
+    elif "agent" not in st.session_state:
+        st.error("Agent not initialized. Check API Key.")
+    else:
+        with st.spinner("Analyzing document structure..."):
+            try:
+                # Determine which part of the brain to use
+                if file_type in ['jpg', 'png', 'jpeg']:
+                    result = st.session_state.agent.process_image(raw_data)
+                else:
+                    # PDF text or Manual Text
+                    result = st.session_state.agent.process(raw_data)
+                
+                # --- RESULTS AREA ---
+                st.success("Processing Complete!")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("Structured Data (JSON)")
+                    st.json(result)
+                
+                with col2:
+                    st.subheader("Summary")
+                    st.write("Key extracted fields:")
+                    # Create a quick table for readability
+                    st.table(result)
+                    
+                    # Download Button
+                    json_str = json.dumps(result, indent=4)
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=json_str,
+                        file_name="processed_data.json",
+                        mime="application/json"
+                    )
+
+            except Exception as e:
+                st.error(f"An error occurred during processing: {e}")
+
+# --- FOOTER ---
+st.markdown("---")
+st.caption("Business Automation Agent v1.0 | Built with Python & Streamlit")
+```
+
+### 3\. How to Run Your UI
+
+1.  Make sure your folder structure is correct (ensure `app.py` is in the root, next to the `src` folder).
+2.  Open your terminal.
+3.  Run the command:
+    ```bash
+    streamlit run app.py
+    ```
+
+### What happens next?
+
+A browser window will automatically open. You will see a modern, clean interface where you can:
+
+1.  **Sidebar:** Enter your API key.
+2.  **Upload:** Drag and drop that "messy invoice image" from your original concept.
+3.  **Click:** Hit "Run Intelligent Automation."
+4.  **Result:** See the clean JSON data appear instantly on the right side.
+
+**Next Step:** Now that you have a UI, would you like a **Docker** file so you can package this whole app up and run it on any computer or server?
