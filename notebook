@@ -1,0 +1,142 @@
+To make testing and experimentation easier, here is the **Jupyter Notebook** version of your agent.
+
+This file (`agent_lab.ipynb`) acts as your "Lab Bench." It allows you to run the code cell-by-cell to visualize the "Manual to Intelligent" transformation instantly without running the full script loop.
+
+### 📓 File: `Business_Automation_Lab.ipynb`
+
+You can run this code in **Google Colab** or your local **Jupyter Notebook**.
+
+#### Cell 1: Setup & Installation
+
+Run this first to install the necessary tools in your notebook environment.
+
+```python
+# Install required libraries
+!pip install openai pypdf pillow python-dotenv
+```
+
+#### Cell 2: The Agent Logic
+
+This cell combines the **Core** (Brain) and **Media** (Eyes) into one easy-to-use class for testing.
+
+````python
+import os
+import json
+import base64
+from openai import OpenAI
+from pypdf import PdfReader
+from IPython.display import display, Markdown
+
+# 🔑 SETUP: Enter your API Key here for the notebook
+os.environ["OPENAI_API_KEY"] = "YOUR_OPENAI_API_KEY_HERE"
+
+class NotebookAgent:
+    def __init__(self):
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.model_text = "gpt-3.5-turbo"
+        self.model_vision = "gpt-4o" # Needed for images
+
+    def _clean_json(self, raw_text):
+        """Helper to extract clean JSON from AI chatter."""
+        try:
+            # Remove markdown code blocks if present
+            clean = raw_text.replace("```json", "").replace("```", "").strip()
+            return json.loads(clean)
+        except:
+            return {"raw_output": raw_text, "error": "Could not parse JSON"}
+
+    def analyze_text(self, text):
+        """Process simple text (Emails, Logs)"""
+        print("🧠 Processing Text...")
+        prompt = """
+        Extract the following from this business text:
+        - client_name
+        - intent (Invoice, Complaint, Request)
+        - priority (High, Medium, Low)
+        - key_dates (list)
+        Return JSON only.
+        """
+        response = self.client.chat.completions.create(
+            model=self.model_text,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0
+        )
+        return self._clean_json(response.choices[0].message.content)
+
+    def analyze_image(self, image_path):
+        """Process Images (Scanned Invoices/Receipts)"""
+        print("👁️ Processing Image...")
+        
+        # Encode image to base64
+        with open(image_path, "rb") as img:
+            base64_img = base64.b64encode(img.read()).decode('utf-8')
+
+        prompt = "Extract data from this document image. Return JSON with fields: type, total_amount, date, vendor."
+        
+        response = self.client.chat.completions.create(
+            model=self.model_vision,
+            messages=[
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_img}"}}
+                ]}
+            ]
+        )
+        return self._clean_json(response.choices[0].message.content)
+
+# Initialize the Agent
+agent = NotebookAgent()
+print("✅ Agent Loaded and Ready.")
+````
+
+#### Cell 3: Simulation (The "Manual Operations")
+
+Use this cell to create a fake "manual" email or input without needing external files.
+
+```python
+# 1. Simulate a messy email from a client
+manual_input_email = """
+Subject: RE: Invoice query
+From: angry_customer@acmecorp.com
+
+Hi, I'm writing regarding the bill for the Q3 audit. 
+You guys charged us $15,000 but the agreement was $12,000.
+We need this fixed by Friday, Dec 12th, or we are cancelling the contract.
+- Steve
+"""
+
+print("--- 📥 INPUT DATA ---")
+print(manual_input_email)
+```
+
+#### Cell 4: Transformation (The "Intelligent Automation")
+
+Run this to see the AI transform the messy email above into clean data.
+
+```python
+# Run the agent on the manual input
+result = agent.analyze_text(manual_input_email)
+
+# Display the result nicely
+print("\n--- 🤖 INTELLIGENT OUTPUT ---")
+print(json.dumps(result, indent=4))
+
+# Visual Check
+if result.get('priority') == 'High':
+    display(Markdown("### 🚨 ALERT: High Priority Item Detected"))
+```
+
+-----
+
+### How to use this Notebook
+
+1.  **Copy/Paste** the cells above into a new Jupyter Notebook or Google Colab project.
+2.  **Paste your API Key** in Cell 2 where it says `YOUR_OPENAI_API_KEY_HERE`.
+3.  **Run the cells** in order.
+
+This allows you to tweak the prompt (the instructions in Cell 2) and see the results instantly in Cell 4 until the logic is perfect. Once you are happy with it, you can move the code back to your `core.py` file.
+
+**Next Step:** Would you like a **Streamlit** script? That would turn this notebook logic into a pretty web app where you can drag-and-drop files to process them.
