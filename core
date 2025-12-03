@@ -1,0 +1,142 @@
+Here is the *Core Logic* for your Business Automation Agent.
+
+In software architecture, the "Core" is the brain. It contains the specific logic that connects to the AI model, sends the instructions, and cleans up the result.
+
+You should create a new file named core.py inside your src folder.
+
+### 1\. The Core Brain (src/core.py)
+
+This file handles the connection to OpenAI. It converts the "Manual Chaos" (messy text) into "Intelligent Order" (JSON).
+
+`python
+import os
+import json
+from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load API keys from .env file
+load_dotenv()
+
+class CoreAgent:
+    def __init__(self):
+        """
+        Initializes the AI Brain.
+        """
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("❌ CRITICAL ERROR: OPENAI_API_KEY not found in .env file.")
+        
+        self.client = OpenAI(api_key=api_key)
+        self.model = "gpt-3.5-turbo" # Cost-effective model for automation
+
+    def process(self, manual_text):
+        """
+        The main logic function.
+        Input: Messy unstructured string.
+        Output: Clean Dictionary (JSON).
+        """
+        print(f"⚙ Core Agent is processing {len(manual_text)} characters...")
+
+        # The System Prompt defines the "Intelligence"
+        system_instruction = """
+        You are a Business Automation Bot. 
+        Your job is to read unstructured text (emails, logs, invoices) and extract key data.
+        
+        Return ONLY a raw JSON object. Do not write markdown.
+        
+        Required Fields:
+        - "category": (Invoice, Complaint, Inquiry, or Spam)
+        - "client_name": (Name of person or company)
+        - "action_required": (Boolean: true/false)
+        - "priority_score": (Integer 1-10)
+        - "summary": (A 1-sentence summary of the text)
+        """
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": manual_text}
+                ],
+                temperature=0.1  # Low temperature = more consistent/factual
+            )
+
+            # Get raw content
+            raw_content = response.choices[0].message.content
+            
+            # Clean and Parse JSON
+            return self._sanitize_json(raw_content)
+
+        except Exception as e:
+            return {"error": "Processing Failed", "details": str(e)}
+
+    def _sanitize_json(self, text_input):
+        """
+        Helper to ensure the AI didn't add extra text like 'Here is your JSON:'
+        """
+        try:
+            # Attempt direct parse
+            return json.loads(text_input)
+        except json.JSONDecodeError:
+            # Fallback: simple cleanup (removes code blocks if present)
+            clean_text = text_input.replace("json", "").replace("", "").strip()
+            return json.loads(clean_text)
+`
+
+-----
+
+### 2\. The Controller (src/main.py)
+
+Now, update your main.py to actually *use* the core brain you just built.
+
+python
+from core import CoreAgent
+import json
+
+def run_automation():
+    # 1. Initialize the Core
+    try:
+        agent = CoreAgent()
+        print("✅ Intelligent Automation Core Online.\n")
+    except Exception as e:
+        print(e)
+        return
+
+    # 2. Simulate Manual Input (The "Before" in your image)
+    # In a real app, this would come from a file reading loop.
+    manual_input = """
+    From: bad_formatting@example.com
+    Subject: URGENT NEED HELP
+    
+    Hey guys, this is Sarah from Acme Logistics. 
+    I need to know why my shipment #998877 hasn't arrived yet??
+    It was supposed to be here yesterday. Please fix this immediately!!
+    """
+    
+    print("--- 📥 INPUT (Manual/Unstructured) ---")
+    print(manual_input.strip())
+    print("--------------------------------------\n")
+
+    # 3. Process with AI (The "Transformation")
+    result_data = agent.process(manual_input)
+
+    # 4. Output Result (The "After" in your image)
+    print("--- 📤 OUTPUT (Intelligent/Structured) ---")
+    print(json.dumps(result_data, indent=4))
+    print("----------------------------------------")
+
+if __name__ == "__main__":
+    run_automation()
+
+
+### 3\. How the "Core" works (Visualized)
+
+[Image of AI agent data processing flow diagram]
+
+
+1.  *Input:* The process() function takes the chaos (Left side of your original image).
+2.  *System Prompt:* This is the specific instruction inside core.py that forces the AI to behave like a business tool, not a chatbot.
+3.  *Sanitization:* The _sanitize_json method ensures that even if the AI talks too much, the program only saves the data.
+
+*Next Step:* Would you like me to add a *"File Watcher"* to this core, so it automatically detects when you drop a new PDF or text file into a folder and processes it instantly?
